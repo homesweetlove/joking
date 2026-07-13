@@ -311,7 +311,7 @@ export default function Main({ onCreatePayroll, onManageEmployees, employees, on
             조교급여<span className="text-blue-600">대장</span>
           </h1>
           <p className="text-xl text-slate-500 font-medium">
-            2026년 최신 법정 이율 반영 · 스마트 급여 관리 솔루션
+            조교급여 웹 구축화 테스트 사이트
           </p>
         </motion.div>
       </header>

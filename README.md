@@ -11,23 +11,6 @@
 - 임금명세서 인쇄 및 PDF 저장
 - **엑셀(.xlsx) 급여대장 내보내기** — 대시보드, 급여대장, 직원별 상세명세, 근태기록까지 포함된 서식 있는 다중 시트 워크북
 
-## 로컬 실행 방법
-
-**사전 준비:** Node.js 설치
-
-1. 의존성 설치
-   ```bash
-   npm install
-   ```
-2. 개발 서버 실행
-   ```bash
-   npm run dev
-   ```
-3. 배포용 빌드
-   ```bash
-   npm run build
-   ```
-
 ## 기술 스택
 
 - React 19 + TypeScript + Vite

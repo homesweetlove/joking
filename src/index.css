@@ -1,0 +1,23 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Inter", "Pretendard", ui-sans-serif, system-ui, sans-serif;
+}
+
+@layer components {
+  .btn-3d {
+    @apply relative inline-flex items-center justify-center px-8 py-4 font-bold text-white transition-all duration-200 bg-blue-600 rounded-xl shadow-[0_8px_0_0_#1d4ed8] active:shadow-none active:translate-y-[8px];
+  }
+  
+  .btn-3d-secondary {
+    @apply relative inline-flex items-center justify-center px-8 py-4 font-bold text-white transition-all duration-200 bg-purple-600 rounded-xl shadow-[0_8px_0_0_#7e22ce] active:shadow-none active:translate-y-[8px];
+  }
+
+  .glass-card {
+    @apply bg-white/80 backdrop-blur-md border border-white/20 shadow-xl rounded-2xl;
+  }
+}
+
+body {
+  @apply bg-slate-50 text-slate-900 min-h-screen;
+}

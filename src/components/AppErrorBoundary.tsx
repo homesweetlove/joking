@@ -1,7 +1,8 @@
-import React from 'react';
+import { Component } from 'react';
+import type { ErrorInfo, ReactNode } from 'react';
 
 interface Props {
-  children: React.ReactNode;
+  children: ReactNode;
 }
 
 interface State {
@@ -16,7 +17,7 @@ const STORAGE_KEYS = [
   'payroll_reports',
 ];
 
-export default class AppErrorBoundary extends React.Component<Props, State> {
+export default class AppErrorBoundary extends Component<Props, State> {
   state: State = {
     hasError: false,
     message: '',
@@ -29,7 +30,7 @@ export default class AppErrorBoundary extends React.Component<Props, State> {
     };
   }
 
-  componentDidCatch(error: unknown, info: React.ErrorInfo) {
+  componentDidCatch(error: unknown, info: ErrorInfo) {
     console.error('Payroll Manager runtime error', error, info);
   }
 

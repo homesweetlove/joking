@@ -7,7 +7,6 @@ import React, { useEffect, useState } from 'react';
 import Main from './views/Main';
 import EmployeeManagement from './views/EmployeeManagement';
 import PayrollCreation from './views/PayrollCreation';
-import AppErrorBoundary from './components/AppErrorBoundary';
 import { Employee, PayrollReport } from './types';
 import { loadPayrollState, saveEmployees, saveReports } from './lib/storage';
 
@@ -70,80 +69,78 @@ export default function App() {
   };
 
   return (
-    <AppErrorBoundary>
-      <div className="min-h-screen font-sans">
-        {storageWarnings.length > 0 && (
-          <div
-            role="alert"
-            className="sticky top-0 z-[100] border-b border-amber-300 bg-amber-50 px-4 py-3 text-amber-950 shadow-sm"
-          >
-            <div className="mx-auto flex max-w-7xl items-start justify-between gap-4">
-              <div>
-                <p className="font-semibold">저장된 데이터 일부를 확인해주세요.</p>
-                <ul className="mt-1 list-disc space-y-1 pl-5 text-sm">
-                  {storageWarnings.map((warning, index) => (
-                    <li key={`${warning}-${index}`}>{warning}</li>
-                  ))}
-                </ul>
-              </div>
-              <button
-                type="button"
-                onClick={() => setStorageWarnings([])}
-                className="shrink-0 rounded-md border border-amber-300 bg-white px-3 py-1.5 text-sm font-medium hover:bg-amber-100"
-              >
-                확인
-              </button>
+    <div className="min-h-screen font-sans">
+      {storageWarnings.length > 0 && (
+        <div
+          role="alert"
+          className="sticky top-0 z-[100] border-b border-amber-300 bg-amber-50 px-4 py-3 text-amber-950 shadow-sm"
+        >
+          <div className="mx-auto flex max-w-7xl items-start justify-between gap-4">
+            <div>
+              <p className="font-semibold">저장된 데이터 일부를 확인해주세요.</p>
+              <ul className="mt-1 list-disc space-y-1 pl-5 text-sm">
+                {storageWarnings.map((warning, index) => (
+                  <li key={`${warning}-${index}`}>{warning}</li>
+                ))}
+              </ul>
             </div>
+            <button
+              type="button"
+              onClick={() => setStorageWarnings([])}
+              className="shrink-0 rounded-md border border-amber-300 bg-white px-3 py-1.5 text-sm font-medium hover:bg-amber-100"
+            >
+              확인
+            </button>
           </div>
-        )}
+        </div>
+      )}
 
-        {currentView === 'MAIN' && (
-          <Main
-            onCreatePayroll={() => setCurrentView('PAYROLL')}
-            onManageEmployees={() => setCurrentView('EMPLOYEES')}
-            employees={employees}
-            onImportEmployees={handleImportEmployees}
-            reports={reports}
-            onImportReport={handleSaveReport}
-            onDeleteReport={handleDeleteReport}
-            onEditReport={(report) => {
-              setEditingReport(report);
-              setCurrentView('PAYROLL');
-            }}
-          />
-        )}
+      {currentView === 'MAIN' && (
+        <Main
+          onCreatePayroll={() => setCurrentView('PAYROLL')}
+          onManageEmployees={() => setCurrentView('EMPLOYEES')}
+          employees={employees}
+          onImportEmployees={handleImportEmployees}
+          reports={reports}
+          onImportReport={handleSaveReport}
+          onDeleteReport={handleDeleteReport}
+          onEditReport={(report) => {
+            setEditingReport(report);
+            setCurrentView('PAYROLL');
+          }}
+        />
+      )}
 
-        {currentView === 'EMPLOYEES' && (
-          <EmployeeManagement
-            employees={employees}
-            onAddEmployee={addEmployee}
-            onUpdateEmployee={updateEmployee}
-            onDeleteEmployee={deleteEmployee}
-            onBack={() => setCurrentView('MAIN')}
-            onImportEmployees={handleImportEmployees}
-          />
-        )}
+      {currentView === 'EMPLOYEES' && (
+        <EmployeeManagement
+          employees={employees}
+          onAddEmployee={addEmployee}
+          onUpdateEmployee={updateEmployee}
+          onDeleteEmployee={deleteEmployee}
+          onBack={() => setCurrentView('MAIN')}
+          onImportEmployees={handleImportEmployees}
+        />
+      )}
 
-        {currentView === 'PAYROLL' && (
-          <PayrollCreation
-            employees={editingReport ? editingReport.employees : employees}
-            reports={reports}
-            onBack={() => {
+      {currentView === 'PAYROLL' && (
+        <PayrollCreation
+          employees={editingReport ? editingReport.employees : employees}
+          reports={reports}
+          onBack={() => {
+            setEditingReport(null);
+            setCurrentView('MAIN');
+          }}
+          onSaveReport={(report) => {
+            if (editingReport) {
+              setReports((prev) => prev.map((item) => (item.id === editingReport.id ? report : item)));
               setEditingReport(null);
-              setCurrentView('MAIN');
-            }}
-            onSaveReport={(report) => {
-              if (editingReport) {
-                setReports((prev) => prev.map((item) => (item.id === editingReport.id ? report : item)));
-                setEditingReport(null);
-              } else {
-                handleSaveReport(report);
-              }
-            }}
-            editReport={editingReport || undefined}
-          />
-        )}
-      </div>
-    </AppErrorBoundary>
+            } else {
+              handleSaveReport(report);
+            }
+          }}
+          editReport={editingReport || undefined}
+        />
+      )}
+    </div>
   );
 }

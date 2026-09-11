@@ -18,10 +18,16 @@ const STORAGE_KEYS = [
 ];
 
 export default class AppErrorBoundary extends Component<Props, State> {
-  state: State = {
-    hasError: false,
-    message: '',
-  };
+  private readonly childContent: ReactNode;
+
+  constructor(props: Props) {
+    super(props);
+    this.childContent = props.children;
+    this.state = {
+      hasError: false,
+      message: '',
+    };
+  }
 
   static getDerivedStateFromError(error: unknown): State {
     return {
@@ -52,7 +58,7 @@ export default class AppErrorBoundary extends Component<Props, State> {
   };
 
   render() {
-    if (!this.state.hasError) return this.props.children;
+    if (!this.state.hasError) return this.childContent;
 
     return (
       <div className="min-h-screen bg-slate-50 px-6 py-16 text-slate-900">

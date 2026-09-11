@@ -24,10 +24,16 @@ export interface ValidationResult<T> {
   warnings?: string[];
 }
 
+export interface SafeParseResult {
+  ok: boolean;
+  data?: any;
+  error?: string;
+}
+
 // -----------------------------------------------------------------------------
 //  1) JSON.parse를 감싸서 사용자에게 보여줄 친절한 에러 메시지로 변환
 // -----------------------------------------------------------------------------
-export function safeParseJSON(text: string): { ok: true; data: any } | { ok: false; error: string } {
+export function safeParseJSON(text: string): SafeParseResult {
   if (!text || text.trim().length === 0) {
     return { ok: false, error: '파일이 비어 있습니다. 올바른 백업(.json) 파일을 선택해주세요.' };
   }
@@ -35,8 +41,6 @@ export function safeParseJSON(text: string): { ok: true; data: any } | { ok: fal
     const data = JSON.parse(text);
     return { ok: true, data };
   } catch (err) {
-    // JSON.parse의 원본 에러(SyntaxError 등)는 비개발자에게 의미가 없으므로
-    // 흔한 실수 패턴을 짐작해 조금 더 구체적인 안내를 붙여줍니다.
     let hint = '선택하신 파일이 올바른 JSON 형식이 아닙니다.';
     const trimmed = text.trim();
     if (trimmed.startsWith('PK')) {
@@ -52,8 +56,6 @@ export function safeParseJSON(text: string): { ok: true; data: any } | { ok: fal
 
 // -----------------------------------------------------------------------------
 //  2) 조교(직원) 백업 검증 + 마이그레이션
-//     - v0(legacy): 파일 내용이 곧 Employee[] 배열 그 자체
-//     - v1+: { schemaVersion, type: 'employee_backup', exportedAt, employees: Employee[] }
 // -----------------------------------------------------------------------------
 function isPlainObject(v: any): v is Record<string, any> {
   return typeof v === 'object' && v !== null && !Array.isArray(v);
@@ -72,7 +74,6 @@ export function validateEmployeeBackupPayload(raw: any): ValidationResult<Employ
   let employeesArray: any[] | null = null;
 
   if (Array.isArray(raw)) {
-    // legacy(v0) 포맷: 배열 자체가 백업 데이터
     employeesArray = raw;
     warnings.push('이전 버전 형식의 백업 파일입니다. 정상적으로 불러왔지만, 새로 내보내시면 최신 형식으로 저장됩니다.');
   } else if (isPlainObject(raw) && Array.isArray(raw.employees)) {
@@ -149,7 +150,6 @@ export function validatePayrollReportPayload(raw: any): ValidationResult<Payroll
     warnings.push('이전 버전 형식의 리포트 파일입니다. 정상적으로 불러왔습니다.');
   }
 
-  // 필수 필드가 다 있으면, 없어도 되는 선택 필드는 안전한 기본값으로 보정합니다.
   const migrated: PayrollReport = {
     id: raw.id,
     createdAt: raw.createdAt,
@@ -243,7 +243,7 @@ export function markBackupDone() {
   try {
     localStorage.setItem(LAST_BACKUP_KEY, new Date().toISOString());
   } catch {
-    // localStorage 접근 불가 환경(사파리 시크릿모드 등)에서는 조용히 무시
+    // localStorage 접근 불가 환경에서는 조용히 무시
   }
 }
 
@@ -265,10 +265,9 @@ export function getDaysSinceLastBackup(): number | null {
   return Math.floor(diffMs / (1000 * 60 * 60 * 24));
 }
 
-/** 백업 리마인더 배너를 보여줘야 하는지 판단 (보호할 데이터가 있고, 백업 이력이 없거나 오래된 경우) */
 export function shouldShowBackupReminder(hasAnyData: boolean): boolean {
   if (!hasAnyData) return false;
   const days = getDaysSinceLastBackup();
-  if (days === null) return true; // 백업한 적 없음
+  if (days === null) return true;
   return days >= BACKUP_REMINDER_THRESHOLD_DAYS;
 }

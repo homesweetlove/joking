@@ -3,11 +3,13 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import Main from './views/Main';
 import EmployeeManagement from './views/EmployeeManagement';
 import PayrollCreation from './views/PayrollCreation';
+import AppErrorBoundary from './components/AppErrorBoundary';
 import { Employee, PayrollReport } from './types';
+import { loadPayrollState, saveEmployees, saveReports } from './lib/storage';
 
 type View = 'MAIN' | 'EMPLOYEES' | 'PAYROLL';
 
@@ -16,48 +18,43 @@ export default function App() {
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [reports, setReports] = useState<PayrollReport[]>([]);
   const [editingReport, setEditingReport] = useState<PayrollReport | null>(null);
+  const [storageReady, setStorageReady] = useState(false);
+  const [storageWarnings, setStorageWarnings] = useState<string[]>([]);
 
-  // Load employees & reports from localStorage on mount
+  const addStorageWarning = (message: string) => {
+    setStorageWarnings((prev) => (prev.includes(message) ? prev : [...prev, message]));
+  };
+
   useEffect(() => {
-    const savedEmp = localStorage.getItem('payroll_employees');
-    if (savedEmp) {
-      try {
-        setEmployees(JSON.parse(savedEmp));
-      } catch (e) {
-        console.error('Failed to parse employees', e);
-      }
-    }
-
-    const savedReports = localStorage.getItem('payroll_reports');
-    if (savedReports) {
-      try {
-        setReports(JSON.parse(savedReports));
-      } catch (e) {
-        console.error('Failed to parse reports', e);
-      }
-    }
+    const restored = loadPayrollState();
+    setEmployees(restored.employees);
+    setReports(restored.reports);
+    setStorageWarnings(restored.warnings);
+    setStorageReady(true);
   }, []);
 
-  // Save employees to localStorage whenever they change
   useEffect(() => {
-    localStorage.setItem('payroll_employees', JSON.stringify(employees));
-  }, [employees]);
+    if (!storageReady) return;
+    const result = saveEmployees(employees);
+    if (!result.ok && result.error) addStorageWarning(result.error);
+  }, [employees, storageReady]);
 
-  // Save reports to localStorage whenever they change
   useEffect(() => {
-    localStorage.setItem('payroll_reports', JSON.stringify(reports));
-  }, [reports]);
+    if (!storageReady) return;
+    const result = saveReports(reports);
+    if (!result.ok && result.error) addStorageWarning(result.error);
+  }, [reports, storageReady]);
 
   const addEmployee = (emp: Employee) => {
-    setEmployees(prev => [...prev, emp]);
+    setEmployees((prev) => [...prev, emp]);
   };
 
   const updateEmployee = (updated: Employee) => {
-    setEmployees(prev => prev.map(e => e.id === updated.id ? updated : e));
+    setEmployees((prev) => prev.map((employee) => (employee.id === updated.id ? updated : employee)));
   };
 
   const deleteEmployee = (id: string) => {
-    setEmployees(prev => prev.filter(e => e.id !== id));
+    setEmployees((prev) => prev.filter((employee) => employee.id !== id));
   };
 
   const handleImportEmployees = (imported: Employee[]) => {
@@ -65,61 +62,88 @@ export default function App() {
   };
 
   const handleSaveReport = (newReport: PayrollReport) => {
-    setReports(prev => [newReport, ...prev]);
+    setReports((prev) => [newReport, ...prev]);
   };
 
   const handleDeleteReport = (reportId: string) => {
-    setReports(prev => prev.filter(r => r.id !== reportId));
+    setReports((prev) => prev.filter((report) => report.id !== reportId));
   };
 
   return (
-    <div className="min-h-screen font-sans">
-      {currentView === 'MAIN' && (
-        <Main 
-          onCreatePayroll={() => setCurrentView('PAYROLL')} 
-          onManageEmployees={() => setCurrentView('EMPLOYEES')} 
-          employees={employees}
-          onImportEmployees={handleImportEmployees}
-          reports={reports}
-          onImportReport={handleSaveReport}
-          onDeleteReport={handleDeleteReport}
-          onEditReport={(report) => {
-            setEditingReport(report);
-            setCurrentView('PAYROLL');
-          }}
-        />
-      )}
-      
-      {currentView === 'EMPLOYEES' && (
-        <EmployeeManagement 
-          employees={employees}
-          onAddEmployee={addEmployee}
-          onUpdateEmployee={updateEmployee}
-          onDeleteEmployee={deleteEmployee}
-          onBack={() => setCurrentView('MAIN')}
-          onImportEmployees={handleImportEmployees}
-        />
-      )}
+    <AppErrorBoundary>
+      <div className="min-h-screen font-sans">
+        {storageWarnings.length > 0 && (
+          <div
+            role="alert"
+            className="sticky top-0 z-[100] border-b border-amber-300 bg-amber-50 px-4 py-3 text-amber-950 shadow-sm"
+          >
+            <div className="mx-auto flex max-w-7xl items-start justify-between gap-4">
+              <div>
+                <p className="font-semibold">저장된 데이터 일부를 확인해주세요.</p>
+                <ul className="mt-1 list-disc space-y-1 pl-5 text-sm">
+                  {storageWarnings.map((warning, index) => (
+                    <li key={`${warning}-${index}`}>{warning}</li>
+                  ))}
+                </ul>
+              </div>
+              <button
+                type="button"
+                onClick={() => setStorageWarnings([])}
+                className="shrink-0 rounded-md border border-amber-300 bg-white px-3 py-1.5 text-sm font-medium hover:bg-amber-100"
+              >
+                확인
+              </button>
+            </div>
+          </div>
+        )}
 
-      {currentView === 'PAYROLL' && (
-        <PayrollCreation 
-          employees={editingReport ? editingReport.employees : employees}
-          reports={reports}
-          onBack={() => {
-            setEditingReport(null);
-            setCurrentView('MAIN');
-          }}
-          onSaveReport={(report) => {
-            if (editingReport) {
-              setReports(prev => prev.map(r => r.id === editingReport.id ? report : r));
+        {currentView === 'MAIN' && (
+          <Main
+            onCreatePayroll={() => setCurrentView('PAYROLL')}
+            onManageEmployees={() => setCurrentView('EMPLOYEES')}
+            employees={employees}
+            onImportEmployees={handleImportEmployees}
+            reports={reports}
+            onImportReport={handleSaveReport}
+            onDeleteReport={handleDeleteReport}
+            onEditReport={(report) => {
+              setEditingReport(report);
+              setCurrentView('PAYROLL');
+            }}
+          />
+        )}
+
+        {currentView === 'EMPLOYEES' && (
+          <EmployeeManagement
+            employees={employees}
+            onAddEmployee={addEmployee}
+            onUpdateEmployee={updateEmployee}
+            onDeleteEmployee={deleteEmployee}
+            onBack={() => setCurrentView('MAIN')}
+            onImportEmployees={handleImportEmployees}
+          />
+        )}
+
+        {currentView === 'PAYROLL' && (
+          <PayrollCreation
+            employees={editingReport ? editingReport.employees : employees}
+            reports={reports}
+            onBack={() => {
               setEditingReport(null);
-            } else {
-              handleSaveReport(report);
-            }
-          }}
-          editReport={editingReport || undefined}
-        />
-      )}
-    </div>
+              setCurrentView('MAIN');
+            }}
+            onSaveReport={(report) => {
+              if (editingReport) {
+                setReports((prev) => prev.map((item) => (item.id === editingReport.id ? report : item)));
+                setEditingReport(null);
+              } else {
+                handleSaveReport(report);
+              }
+            }}
+            editReport={editingReport || undefined}
+          />
+        )}
+      </div>
+    </AppErrorBoundary>
   );
 }

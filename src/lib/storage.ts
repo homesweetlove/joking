@@ -96,47 +96,50 @@ function getStorage(): Storage | null {
   }
 }
 
+function decodeEnvelope<T>(
+  raw: string,
+  expectedType: StorageEnvelope<T>['type'],
+  validate: Validation<T>,
+): { data?: T; error?: string } {
+  try {
+    const parsed = parseJSON(raw) as Partial<StorageEnvelope<unknown>>;
+    if (
+      !parsed ||
+      typeof parsed !== 'object' ||
+      parsed.type !== expectedType ||
+      typeof parsed.schemaVersion !== 'number' ||
+      !('data' in parsed)
+    ) {
+      return { error: '저장 데이터 포맷이 올바르지 않습니다.' };
+    }
+
+    const validated = validate(parsed.data);
+    if (!validated.valid || validated.data === undefined) {
+      return { error: validated.error || '저장 데이터 검증에 실패했습니다.' };
+    }
+
+    return { data: validated.data };
+  } catch (error) {
+    return {
+      error: error instanceof Error ? error.message : '저장 데이터를 읽는 중 알 수 없는 오류가 발생했습니다.',
+    };
+  }
+}
+
 function readEnvelope<T>(
   storage: Storage,
   key: string,
   expectedType: StorageEnvelope<T>['type'],
   validate: Validation<T>,
 ): { data?: T; warning?: string; recoveredFromBackup?: boolean } {
-  const tryRead = (targetKey: string): { data?: T; error?: string } => {
-    const raw = storage.getItem(targetKey);
-    if (!raw) return {};
-
-    try {
-      const parsed = parseJSON(raw) as Partial<StorageEnvelope<unknown>>;
-      if (
-        !parsed ||
-        typeof parsed !== 'object' ||
-        parsed.type !== expectedType ||
-        typeof parsed.schemaVersion !== 'number' ||
-        !('data' in parsed)
-      ) {
-        return { error: '저장 데이터 포맷이 올바르지 않습니다.' };
-      }
-
-      const validated = validate(parsed.data);
-      if (!validated.valid || validated.data === undefined) {
-        return { error: validated.error || '저장 데이터 검증에 실패했습니다.' };
-      }
-
-      return { data: validated.data };
-    } catch (error) {
-      return {
-        error: error instanceof Error ? error.message : '저장 데이터를 읽는 중 알 수 없는 오류가 발생했습니다.',
-      };
-    }
-  };
-
-  const primary = tryRead(key);
+  const primaryRaw = storage.getItem(key);
+  const primary = primaryRaw ? decodeEnvelope(primaryRaw, expectedType, validate) : {};
   if (primary.data !== undefined) {
     return { data: primary.data };
   }
 
-  const backup = tryRead(`${key}:bak`);
+  const backupRaw = storage.getItem(`${key}:bak`);
+  const backup = backupRaw ? decodeEnvelope(backupRaw, expectedType, validate) : {};
   if (backup.data !== undefined) {
     return {
       data: backup.data,
@@ -180,6 +183,7 @@ function writeEnvelope<T>(
   key: string,
   type: StorageEnvelope<T>['type'],
   data: T,
+  validate: Validation<T>,
 ): StorageWriteResult {
   const storage = getStorage();
   if (!storage) {
@@ -199,9 +203,13 @@ function writeEnvelope<T>(
   try {
     const current = storage.getItem(key);
     if (current) {
-      // 새 값을 쓰기 전에 직전 정상본을 별도 키에 남겨 둡니다.
-      storage.setItem(`${key}:bak`, current);
+      // 손상된 최신본이 정상 백업본을 덮어쓰지 않도록, 검증된 현재 데이터만 백업합니다.
+      const currentDecoded = decodeEnvelope(current, type, validate);
+      if (currentDecoded.data !== undefined) {
+        storage.setItem(`${key}:bak`, current);
+      }
     }
+
     storage.setItem(key, JSON.stringify(envelope));
     return { ok: true };
   } catch (error) {
@@ -269,16 +277,16 @@ export function loadPayrollState(): PayrollStorageState {
 
 export function saveEmployees(employees: Employee[]): StorageWriteResult {
   const validation = validateEmployees(employees);
-  if (!validation.valid || !validation.data) {
+  if (!validation.valid || validation.data === undefined) {
     return { ok: false, error: validation.error || '직원 데이터 검증에 실패했습니다.' };
   }
-  return writeEnvelope(EMPLOYEES_KEY, 'employees', validation.data);
+  return writeEnvelope(EMPLOYEES_KEY, 'employees', validation.data, validateEmployees);
 }
 
 export function saveReports(reports: PayrollReport[]): StorageWriteResult {
   const validation = validateReports(reports);
-  if (!validation.valid || !validation.data) {
+  if (!validation.valid || validation.data === undefined) {
     return { ok: false, error: validation.error || '급여대장 데이터 검증에 실패했습니다.' };
   }
-  return writeEnvelope(REPORTS_KEY, 'reports', validation.data);
+  return writeEnvelope(REPORTS_KEY, 'reports', validation.data, validateReports);
 }
